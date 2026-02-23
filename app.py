@@ -147,9 +147,9 @@ total_net_b = res_h_b['net_income'] + res_w_b['net_income']
 st.divider()
 net_diff = abs(total_net_a - total_net_b)
 winner = "夫" if total_net_a > total_net_b else "妻"
-st.success(f"💡 **{winner}** が扶養に入れる方が、世帯全体の手取り額が年間 **{net_diff:,}円** 多くなります。")
+st.success(f"💡 **{winner}** が扶養に入れる方が、夫婦2人の手取り額が年間 **{net_diff:,}円** 多くなります。")
 
-st.subheader("📊 世帯手取り額と内訳の比較")
+st.subheader("📊 夫婦の手取り額合計と内訳の比較")
 
 def get_row_data(h, w):
     """表の1列分のデータを作成する"""
