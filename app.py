@@ -2,14 +2,14 @@ import streamlit as st
 import math
 
 def get_specific_dep_deduction(child_annual_salary):
-    """特定親族特別控除の計算 (123万円の壁・2026年度改正想定)"""
-    # 子の所得を算出（年収 - 65万円）
+    """特定親族特別控除の計算 (123万円・150万円の境界線を再現)"""
+    # 子の所得を算出（年収 - 65万円） [cite: 2025-12-29]
     total_income = max(0, child_annual_salary - 650_000)
     
     # 58万円以下（年収123万円以下）なら満額の65万円控除
     if total_income <= 580_000:
         return 650_000
-    # 58万円超〜85万円以下なら63万円にダウン
+    # 58万円超〜85万円以下（年収150万円以下）なら63万円
     elif total_income <= 850_000:
         return 630_000
     # 85万円超〜90万円以下なら61万円にダウン
@@ -36,7 +36,7 @@ def calculate_tax_details(annual_income, allowance_monthly, social_ins, life_ins
     """個人の税金・手取り計算ロジック"""
     total_gross = annual_income + (allowance_monthly * 12)
     
-    # 1. 給与所得控除 (2026年改正想定の簡易計算)
+    # 1. 給与所得控除 (2026年改正想定)
     if total_gross <= 1_625_000:
         salary_ded = 550_000
     elif total_gross <= 1_800_000:
@@ -59,7 +59,6 @@ def calculate_tax_details(annual_income, allowance_monthly, social_ins, life_ins
     total_common_ded_itax = social_ins + life_ins + eq_itax + ideco
     
     # 3. 課税所得と所得税
-    # 課税所得 = 給与所得 - (社会保険料 + 生命保険料 + 地震保険料 + iDeCo + 扶養控除 + 基礎控除)
     taxable_itax = max(0, salary_income - (total_common_ded_itax + dep_itax + basic_itax))
     taxable_itax = (taxable_itax // 1000) * 1000
     
@@ -110,15 +109,15 @@ with st.sidebar:
             c_salary = st.number_input(f"子の年収：額面（{i+1}人目）", value=1_030_000, step=10_000)
             c_income = max(0, c_salary - 650_000)
             st.caption(f"判定用所得: {c_income:,}円")
-            if c_income > 580_000:
-                 st.warning("⚠️ 年収123万円超：控除額が減り始めています")
+            # 警告を所得85万円（年収150万円）超に変更 [cite: 2025-12-29, 2026-01-11]
+            if c_income > 850_000:
+                 st.warning("⚠️ 年収150万円超：控除額がさらに減り始めています")
             spec_dep_itax += get_specific_dep_deduction(c_salary)
     
-    # 扶養控除合計の算出
     dep_itax = (count_gen * 380_000) + spec_dep_itax
     dep_res = (count_gen * 330_000) + (count_spec * 450_000)
 
-# メインコンテンツ：夫婦の入力
+# メイン：夫婦の入力 [cite: 2025-12-29]
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("夫の条件")
@@ -138,28 +137,22 @@ with col2:
     w_eq = st.number_input("地震保険料（妻）", value=0)
     w_ideco = st.number_input("iDeCo年間掛金（妻）", value=0, step=12_000) # デフォルト0
 
-# --- パターン判定計算 ---
-
-# パターンA: 夫が扶養
+# パターン判定
 res_h_a = calculate_tax_details(h_inc, h_allowance, h_soc, h_life, h_eq, h_ideco, dep_itax, dep_res)
 res_w_a = calculate_tax_details(w_inc, 0, w_soc, w_life, w_eq, w_ideco, 0, 0)
 total_net_a = res_h_a['net_income'] + res_w_a['net_income']
 
-# パターンB: 妻が扶養
 res_h_b = calculate_tax_details(h_inc, 0, h_soc, h_life, h_eq, h_ideco, 0, 0)
 res_w_b = calculate_tax_details(w_inc, w_allowance, w_soc, w_life, w_eq, w_ideco, dep_itax, dep_res)
 total_net_b = res_h_b['net_income'] + res_w_b['net_income']
 
-# --- 結果の表示 ---
+# 結果表示
 st.divider()
-
 net_diff = abs(total_net_a - total_net_b)
 winner = "夫" if total_net_a > total_net_b else "妻"
-
-# 1. 最適パターンの提示と差額
+# 表記を「夫婦」に統一 [cite: 2026-01-11]
 st.success(f"💡 **{winner}** が扶養に入れる方が、夫婦の最終的な手取り額が年間 **{net_diff:,}円** 多くなります。")
 
-# 2. 詳細比較表
 def get_row_data(h, w):
     return [
         f"**{h['net_income'] + w['net_income']:,}円**",
@@ -175,5 +168,3 @@ st.table({
     "パターンA (夫が扶養)": get_row_data(res_h_a, res_w_a),
     "パターンB (妻が扶養)": get_row_data(res_h_b, res_w_b),
 })
-
-st.caption("※納税額は所得税（復興特別所得税含）と住民税の合計です。")
